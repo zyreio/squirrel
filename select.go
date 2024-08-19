@@ -13,12 +13,14 @@ type selectData struct {
 	PlaceholderFormat PlaceholderFormat
 	RunWith           BaseRunner
 	Prefixes          []Sqlizer
+	CTEs              []Sqlizer
 	Options           []string
 	Columns           []Sqlizer
 	From              Sqlizer
 	Joins             []Sqlizer
 	WhereParts        []Sqlizer
 	GroupBys          []string
+	Settings          []string
 	HavingParts       []Sqlizer
 	OrderByParts      []Sqlizer
 	Limit             string
@@ -75,6 +77,15 @@ func (d *selectData) toSqlRaw() (sqlStr string, args []interface{}, err error) {
 			return
 		}
 
+		sql.WriteString(" ")
+	}
+
+	if len(d.CTEs) > 0 {
+		sql.WriteString("WITH ")
+		args, err = appendToSql(d.CTEs, sql, ", ", args)
+		if err != nil {
+			return
+		}
 		sql.WriteString(" ")
 	}
 
@@ -145,6 +156,11 @@ func (d *selectData) toSqlRaw() (sqlStr string, args []interface{}, err error) {
 	if len(d.Offset) > 0 {
 		sql.WriteString(" OFFSET ")
 		sql.WriteString(d.Offset)
+	}
+
+	if len(d.Settings) > 0 {
+		sql.WriteString(" SETTINGS ")
+		sql.WriteString(strings.Join(d.Settings, ", "))
 	}
 
 	if len(d.Suffixes) > 0 {
@@ -253,6 +269,22 @@ func (b SelectBuilder) Options(options ...string) SelectBuilder {
 	return builder.Extend(b, "Options", options).(SelectBuilder)
 }
 
+// With adds a non-recursive CTE to the query.
+func (b SelectBuilder) With(alias string, expr Sqlizer) SelectBuilder {
+	return b.WithCTE(CTE{Alias: alias, ColumnList: []string{}, Recursive: false, Expression: expr})
+}
+
+// WithRecursive adds a recursive CTE to the query.
+func (b SelectBuilder) WithRecursive(alias string, expr Sqlizer) SelectBuilder {
+	return b.WithCTE(CTE{Alias: alias, ColumnList: []string{}, Recursive: true, Expression: expr})
+}
+
+// WithCTE adds an arbitrary Sqlizer to the query.
+// The sqlizer will be sandwiched between the keyword WITH and, if there's more than one CTE, a comma.
+func (b SelectBuilder) WithCTE(cte Sqlizer) SelectBuilder {
+	return builder.Append(b, "CTEs", cte).(SelectBuilder)
+}
+
 // Columns adds result columns to the query.
 func (b SelectBuilder) Columns(columns ...string) SelectBuilder {
 	parts := make([]interface{}, 0, len(columns))
@@ -272,7 +304,8 @@ func (b SelectBuilder) RemoveColumns() SelectBuilder {
 // Column adds a result column to the query.
 // Unlike Columns, Column accepts args which will be bound to placeholders in
 // the columns string, for example:
-//   Column("IF(col IN ("+squirrel.Placeholders(3)+"), 1, 0) as col", 1, 2, 3)
+//
+//	Column("IF(col IN ("+squirrel.Placeholders(3)+"), 1, 0) as col", 1, 2, 3)
 func (b SelectBuilder) Column(column interface{}, args ...interface{}) SelectBuilder {
 	return builder.Append(b, "Columns", newPart(column, args...)).(SelectBuilder)
 }
@@ -349,6 +382,11 @@ func (b SelectBuilder) Where(pred interface{}, args ...interface{}) SelectBuilde
 // GroupBy adds GROUP BY expressions to the query.
 func (b SelectBuilder) GroupBy(groupBys ...string) SelectBuilder {
 	return builder.Extend(b, "GroupBys", groupBys).(SelectBuilder)
+}
+
+// Setting adds SETTINGS expressions to the query.
+func (b SelectBuilder) Setting(settings ...string) SelectBuilder {
+	return builder.Extend(b, "Settings", settings).(SelectBuilder)
 }
 
 // Having adds an expression to the HAVING clause of the query.
