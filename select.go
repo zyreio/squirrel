@@ -21,6 +21,7 @@ type selectData struct {
 	WhereParts        []Sqlizer
 	GroupBys          []string
 	Settings          []string
+	Emit              string
 	HavingParts       []Sqlizer
 	OrderByParts      []Sqlizer
 	Limit             string
@@ -156,6 +157,11 @@ func (d *selectData) toSqlRaw() (sqlStr string, args []interface{}, err error) {
 	if len(d.Offset) > 0 {
 		sql.WriteString(" OFFSET ")
 		sql.WriteString(d.Offset)
+	}
+
+	if len(d.Settings) > 0 {
+		sql.WriteString(" EMIT ")
+		sql.WriteString(d.Emit)
 	}
 
 	if len(d.Settings) > 0 {
@@ -387,6 +393,11 @@ func (b SelectBuilder) GroupBy(groupBys ...string) SelectBuilder {
 // Setting adds SETTINGS expressions to the query.
 func (b SelectBuilder) Setting(settings ...string) SelectBuilder {
 	return builder.Extend(b, "Settings", settings).(SelectBuilder)
+}
+
+// Emit adds EMIT expressions to the query.
+func (b SelectBuilder) Emit(emit string) SelectBuilder {
+	return builder.Set(b, "Emit", emit).(SelectBuilder)
 }
 
 // Having adds an expression to the HAVING clause of the query.
