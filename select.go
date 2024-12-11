@@ -159,7 +159,7 @@ func (d *selectData) toSqlRaw() (sqlStr string, args []interface{}, err error) {
 		sql.WriteString(d.Offset)
 	}
 
-	if len(d.Settings) > 0 {
+	if len(d.Emit) > 0 {
 		sql.WriteString(" EMIT ")
 		sql.WriteString(d.Emit)
 	}
